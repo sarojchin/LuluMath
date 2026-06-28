@@ -1,7 +1,12 @@
 # LuluMath — Multiplication Training Game
 
-**Design document v0.1**
-Platform: iOS + Android phone app · Engine: Unity (C#)
+**Design document v0.2**
+Platform: iOS + Android phone app · Stack: **React Native + Expo (TypeScript)**
+
+> **Stack note (v0.2):** originally scoped for Unity, but switched to **Expo** so the
+> game can be tested instantly on both iPhone and Android via the Expo Go app — no
+> Xcode, no Android SDK, no Mac build chain required. The 3D pet (Milestone 3+) will
+> use `expo-gl` + `three.js` (react-three-fiber) rather than Unity's renderer.
 
 ---
 
@@ -172,16 +177,18 @@ becomes a more capable, expressive creature as the child masters more tables.
 | Lv 25 | "Robust" adult form — full animation rig, emotes, idle behaviors |
 | Lv 30+ | Prestige/legendary variants tied to mastering all 12 tables |
 
-### Technical approach (Unity)
-- **Modular pet rig:** a base skeleton with swappable mesh/material parts so choices
-  combine without a combinatorial explosion of full models. (Body + element +
-  feature + theme = layered parts on one rig.)
-- **State machine (Animator):** Idle / Happy / Sad / Cheer / Levelup / Sleep, driven by game events.
-- **Rendered with URP** (Universal Render Pipeline) for good mobile performance.
-- **Asset source:** start with a single stylized creature + part variants; the
-  `generate_3d` / asset pipeline can produce GLB meshes that get rigged in-engine.
+### Technical approach (Expo / React Native)
+- **Renderer:** `expo-gl` + `three.js` via **react-three-fiber**, loading **GLB/glTF**
+  models with `expo-three`. Animations driven by three.js's `AnimationMixer`.
+- **Modular pet rig:** a base mesh with swappable parts/materials so choices combine
+  without a combinatorial explosion of full models (body + element + feature + theme).
+- **Animation states:** Idle / Happy / Sad / Cheer / Levelup / Sleep, switched on game events.
+- **Asset source:** start with a single stylized creature + part variants; GLB meshes can
+  come from the `generate_3d` pipeline, then get wired up in three.js.
 - Pet config (current parts + unlocked sets) is data, stored in the save file, so the
   pet rebuilds identically on every launch.
+- **Performance:** keep poly counts low, bake lighting, cap device pixel ratio, and
+  reduce FX on low-end phones. (This is the area where Expo asks more care than Unity would.)
 
 ---
 
@@ -237,51 +244,60 @@ Settings {
 }
 ```
 
-**Persistence:** local-first. Save as JSON (e.g. via `JsonUtility` or Newtonsoft)
-in `Application.persistentDataPath`. No account required to play. Optional cloud
-save (iCloud / Google Play Games) and multi-profile support are post-MVP.
+> The data model above is conceptual; the implemented version lives in
+> `src/game/types.ts` and `src/state/progress.ts` as TypeScript.
+
+**Persistence:** local-first. Save as JSON via **AsyncStorage** on the device
+(in-memory only in Milestone 1; AsyncStorage added in a later milestone). No account
+required to play. Optional cloud save and multi-profile support are post-MVP.
 
 ---
 
-## 9. Project Structure (Unity)
+## 9. Project Structure (Expo / React Native)
 
 ```
 LuluMath/
-├── Assets/
-│   ├── Scenes/            Home, Map, Challenge, Results, PetLab
-│   ├── Scripts/
-│   │   ├── Core/          GameManager, SaveSystem, AudioManager, SceneRouter
-│   │   ├── Curriculum/    QuestionGenerator, StageRunner, Timer, ScoreRules
-│   │   ├── Progression/   ProgressTracker, UnlockLogic, ExpSystem, LevelCurve
-│   │   ├── Pet/           PetController, PetRig, PetAnimator, EvolutionChoices
-│   │   ├── UI/            screen controllers, NumberPad, ExpBar, MapNode
-│   │   └── Data/          PlayerProfile, PetState, ScriptableObject configs
-│   ├── Prefabs/           Pet parts, UI widgets, map nodes
-│   ├── Art/               Models, materials, textures, animations
-│   ├── Audio/             SFX, music, pet voice packs
-│   └── Config/            CurriculumConfig, ExpConfig, PetConfig (ScriptableObjects)
-├── Packages/              URP, Input System, etc.
-├── ProjectSettings/
+├── App.tsx                 Screen state machine (home / challenge / results)
+├── index.ts                Expo entry point
+├── app.json                Expo config (name, slug, orientation, icons)
+├── src/
+│   ├── game/               Pure game logic (no React) — testable in isolation
+│   │   ├── types.ts        Question, StageConfig, RoundResult
+│   │   ├── questions.ts    QuestionGenerator + shuffle + makeStage
+│   │   ├── stages.ts       Stage labels, keys, goal text
+│   │   └── scoring.ts      Pass/fail rules, EXP, level curve
+│   ├── state/
+│   │   └── progress.ts     Mastery, best times, EXP, the stage ladder
+│   ├── screens/            HomeScreen, ChallengeScreen, ResultsScreen
+│   ├── components/         NumberPad, AnswerCard, Sparkles
+│   ├── util/               haptics
+│   └── theme.ts            Colours, radii, spacing
+├── assets/                 App icon, splash
 └── DESIGN.md
 ```
 
 **Key engineering choices**
-- **ScriptableObjects** for all tunable data (curriculum, EXP, pet sets) → designers tune without recompiling.
-- **Event-driven:** an `EventBus` connects gameplay → EXP → pet reactions, keeping systems decoupled.
-- **URP** + texture atlasing + modular pet parts for mobile performance.
-- **New Input System** for clean touch handling.
-- Target **60 fps**; pet LOD / reduced FX on low-end devices.
+- **Pure game core:** everything in `src/game/` is plain TypeScript with no React/Expo
+  imports, so the rules can be unit-tested and reused regardless of the UI.
+- **Built-in `Animated` API** (not Reanimated) for the satisfying feedback — fewer deps,
+  no extra Babel config, runs cleanly in Expo Go.
+- **Tunable constants** (time goal, EXP values, level curve) live as named exports, ready
+  to be promoted to a settings/config object.
+- Target **60 fps**; reduced FX / reduced-motion mode on low-end devices.
+
+See **README.md** for how to run it on your phone.
 
 ---
 
 ## 10. Build Roadmap
 
-**Milestone 0 — Skeleton**
-Project setup (URP, folders, scenes), SaveSystem, navigation between empty screens.
+**Milestone 0 — Skeleton** ✅
+Expo project setup, folder structure, screen navigation (home / challenge / results).
 
-**Milestone 1 — Core gameplay (the math works)**
-QuestionGenerator, StageRunner, timer, number pad, pass/fail rules, Results screen.
-Table 1 fully playable (In Order → Random) with placeholder visuals.
+**Milestone 1 — Core gameplay (the math works)** ✅
+QuestionGenerator, stage runner, timer, number pad, pass/fail rules, Results screen,
+satisfying correct-answer feedback. Table 1 fully playable (In Order → Random) with
+placeholder visuals.
 
 **Milestone 2 — Progression**
 Full 1–12 ladder, Mixed Review, unlock logic, EXP earning, player levels, Adventure Map.
