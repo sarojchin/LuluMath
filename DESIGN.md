@@ -86,8 +86,25 @@ These live in a `CurriculumConfig` ScriptableObject so they can be tuned without
 **Input method:** number pad (big, tappable). Multiple-choice mode available as an
 accessibility / younger-kid option in settings.
 
-**Feedback:** immediate — green pulse + chime on correct, gentle shake + the right
-answer on wrong. The pet animates to reactions (cheers on a streak, encourages on a miss).
+### Correct-answer feedback — satisfying, not overwhelming
+
+Getting one right should feel *good* every single time without becoming noisy or
+slowing the round down. The target is a quick, juicy "pop" that reads in ~250 ms.
+
+- **The number itself** — pressed key does a snappy scale punch (1.0 → 1.15 → 1.0) with a soft ease; the answer slot fills with a green pulse and a subtle checkmark sweep.
+- **A short, light sound** — a clean rising "ding," pitched **up a step per correct answer in a streak** (do → re → mi …) so a flawless run literally plays a little melody. Resets on a miss.
+- **A tiny particle burst** — a few sparkles/confetti bits from the answer slot, kept minimal (≤ ~8 particles, quick fade). FX scales down on low-end devices.
+- **Haptics** — a light tap (iOS impact-light / Android equivalent), toggleable in settings.
+- **The pet** — a quick happy bob/ear-flick, not a full celebration, so reactions don't stack into chaos on fast runs.
+- **Streak moments** — every 5th-in-a-row gets a slightly bigger flourish (brief glow + a "+combo" tick) so there's escalation without every answer being a fireworks show.
+
+All of the above are driven by a single `AnswerFeedback` component reading values
+from a ScriptableObject, so intensity, sound, and particle count are tunable —
+and a **Reduced Motion / calm mode** in settings dials FX and haptics down for
+kids who find them distracting.
+
+**Wrong answer:** gentle, non-punishing — a soft shake, a muted low tone, the
+correct answer shown briefly; the pet gives an encouraging nudge. Streak melody resets.
 
 ---
 
@@ -117,6 +134,14 @@ then decays (10 → 5 → 2 → 1) so progress comes from advancing, not repeati
 ## 6. The Pet (3D Companion)
 
 The emotional hook. One pet per save, fully 3D, rendered live on the home screen.
+
+### First-run: pick your species
+On first launch (after a short welcome), the child **chooses their pet species**
+from a small lineup of distinct creatures (e.g. dragon, fox-thing, slime, bird,
+critter). Each species shares the same evolution *system* (§ milestones below) but
+has its own base model, idle animations, and voice flavor, so two kids who pick
+differently get genuinely different companions. They then name it. Species is
+fixed for that save; a fresh start lets them pick again.
 
 ### How it "levels up according to your choice"
 At each **milestone level**, the player is offered a **choice node** — a branching
@@ -169,7 +194,9 @@ becomes a more capable, expressive creature as the child masters more tables.
 5. **Pet Lab** — view the pet, see unlocked sets, make milestone evolution choices, rename, preview future evolutions.
 6. **Settings / Parent area** — table range, ×0/×1 toggles, time goal, input mode (number pad vs. multiple choice), sound, and a lightweight parent gate for any sensitive settings.
 
-**Style:** bright, rounded, friendly; large touch targets; readable for ages ~6–11;
+0. **Onboarding (first run only)** — short welcome → **pick-your-species** lineup → name the pet → straight into Table 1.
+
+**Style:** bright, rounded, friendly; large touch targets; readable for **ages 6–11**;
 portrait orientation; works one-handed.
 
 ---
@@ -192,6 +219,7 @@ TableProgress {
 }
 
 PetState {
+    SpeciesId species               // chosen at first run, fixed for the save
     int stage                       // evolution stage
     Element element                 // Ember | Aqua | Leaf | ...
     BodyType body
@@ -271,10 +299,16 @@ Audio, juice/feedback, settings + parent gate, accessibility (multiple choice, l
 
 ---
 
-## 11. Open Questions
+## 11. Decisions & Open Questions
 
-1. **Pet art direction** — one signature creature, or pick-your-species at the start?
-2. **Table range** — cap at 12, or go to 10? Affects "Grand Master" pacing.
-3. **Monetization** — fully free, one-time purchase, or cosmetic-only IAP? (No pay-to-progress, per pillar 4.)
-4. **Age target** — narrowing to ~6–9 vs ~6–11 changes UI scale and reading level.
-5. **Parental dashboard** — is progress reporting for parents in scope?
+**Locked in**
+- **Pet:** pick-your-species at the start (small lineup, shared evolution system).
+- **Age target:** **6–11** — UI scale and reading level tuned for this range.
+- **Monetization:** **free** for now (no IAP, no pay-to-progress).
+- **Table range:** caps at **12** → "Grand Master" is mastering all of 1–12.
+- **Correct-answer feedback:** quick, satisfying "pop" (scale punch + green pulse, rising streak melody, small particle burst, light haptic) with a calm/reduced-motion mode — deliberately not overwhelming.
+
+**Still open**
+1. **Species lineup** — how many starters, and which creatures (dragon / fox / slime / bird / critter …)?
+2. **Parental dashboard** — is progress reporting for parents in scope, or post-MVP?
+3. **×0 / ×1 questions** — include by default for 6–11, or start at ×2 for the youngest?
